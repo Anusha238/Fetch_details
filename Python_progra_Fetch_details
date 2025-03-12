@@ -1,0 +1,56 @@
+import requests
+import pandas as pd
+
+# Define constants
+API_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
+HEADERS = {"User-Agent": "ResearchFetcher/1.0"}
+AFFILIATION_KEYWORDS = ["pharmaceutical", "biotech", "biopharma", "biosciences", "therapeutics"]
+
+def fetch_papers(query, limit=50):
+    """Fetch papers from Semantic Scholar API based on a query."""
+    params = {
+        "query": query,
+        "fields": "title,authors,year,url",
+        "limit": limit
+    }
+    response = requests.get(API_URL, params=params, headers=HEADERS)
+    
+    if response.status_code == 200:
+        return response.json().get("data", [])
+    else:
+        print(f"Error: {response.status_code}")
+        return []
+
+def filter_papers(papers):
+    """Filter papers where at least one author has a pharma/biotech affiliation."""
+    filtered = []
+    
+    for paper in papers:
+        for author in paper.get("authors", []):
+            affiliation = author.get("affiliations", "").lower()
+            if any(keyword in affiliation for keyword in AFFILIATION_KEYWORDS):
+                filtered.append({
+                    "Title": paper["title"],
+                    "Authors": ", ".join(a.get("name", "") for a in paper.get("authors", [])),
+                    "Year": paper["year"],
+                    "URL": paper["url"]
+                })
+                break  # No need to check other authors
+    
+    return filtered
+
+def save_to_csv(papers, filename="research_papers.csv"):
+    """Save filtered papers to a CSV file."""
+    df = pd.DataFrame(papers)
+    df.to_csv(filename, index=False)
+    print(f"Saved {len(papers)} papers to {filename}")
+
+if __name__ == "__main__":
+    user_query = input("Enter your research query: ")
+    papers = fetch_papers(user_query)
+    filtered_papers = filter_papers(papers)
+    
+    if filtered_papers:
+        save_to_csv(filtered_papers)
+    else:
+        print("No relevant papers found with pharma/biotech affiliation.")
